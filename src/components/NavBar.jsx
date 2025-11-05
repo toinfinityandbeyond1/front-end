@@ -2,11 +2,14 @@ import React from "react";
 
 export default function NavBar({ activeTab, setActiveTab }) {
   const tabs = [
-    { name: "Research", path: "/research" },
-    { name: "Data", path: "/data" },
-    { name: "Scrapers", path: "/scrapers" },
-    { name: "Debug", path: "/debug" },
-  ];
+  { name: "Research", path: "/research" },
+  { name: "Data", path: "/data" },
+  { name: "Scrapers", path: "/scrapers" },
+  { name: "Trends", path: "/trends" }, // optional if you already have it
+  { name: "Plays", path: "/plays" },   // <-- new
+  { name: "Debug", path: "/debug" },
+];
+
 
   return (
     <nav
