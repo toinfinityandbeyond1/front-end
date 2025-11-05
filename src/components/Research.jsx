@@ -1,28 +1,18 @@
+// src/components/Research.jsx
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
+import OutcomeAnalysisPanel from "./OutcomeAnalysisPanel";
 
 export default function Research() {
   const [columns, setColumns] = useState([]);
+  const [allGames, setAllGames] = useState([]);
   const [conditions, setConditions] = useState([]);
   const [results, setResults] = useState([]);
-  const [, setExcluded] = useState([]); // unused, avoid eslint error
+  const [, setExcluded] = useState([]); // unused, keep for now
   const [commonFactors, setCommonFactors] = useState({});
   const [excludedFactors, setExcludedFactors] = useState({});
+  const [savedRules, setSavedRules] = useState([]);
   const [error, setError] = useState(null);
-
-  // Quick test fetch
-  useEffect(() => {
-    const testFetch = async () => {
-      try {
-        const { data, error } = await supabase.from("ball_games").select("*").limit(5);
-        if (error) throw error;
-        console.log("Test fetch returned rows:", data);
-      } catch (err) {
-        console.error("Test fetch error:", err);
-      }
-    };
-    testFetch();
-  }, []);
 
   // Load columns from RPC
   useEffect(() => {
@@ -39,15 +29,24 @@ export default function Research() {
     fetchColumns();
   }, []);
 
-  const addCondition = () => setConditions([...conditions, { logic: "AND", column: "", operator: "", value: "" }]);
-  const updateCondition = (index, key, value) => {
-    const updated = [...conditions];
-    updated[index][key] = value;
-    setConditions(updated);
-  };
+  // Load all games
+  useEffect(() => {
+    const fetchAllGames = async () => {
+      try {
+        const { data, error } = await supabase.from("ball_games").select("*");
+        if (error) throw error;
+        setAllGames(data || []);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchAllGames();
+  }, []);
 
+  // ---------------- Reverse Engineer Function ----------------
   const handleReverseEngineer = async () => {
     if (!conditions.length) return;
+
     let includedGames = [];
     const numericTypes = ["numeric", "integer", "bigint", "smallint", "real", "double precision"];
 
@@ -80,8 +79,7 @@ export default function Research() {
 
     setResults(includedGames);
 
-    // Fetch all games for excluded/common factors
-    const { data: allGames } = await supabase.from("ball_games").select("*");
+    // Compute excluded and common factors
     const excludedGames = allGames.filter(g => !includedGames.some(i => i.id === g.id));
     setExcluded(excludedGames);
 
@@ -99,11 +97,19 @@ export default function Research() {
     setExcludedFactors(excludedCommon);
   };
 
+  const addCondition = () => setConditions([...conditions, { logic: "AND", column: "", operator: "", value: "" }]);
+  const updateCondition = (index, key, value) => {
+    const updated = [...conditions];
+    updated[index][key] = value;
+    setConditions(updated);
+  };
+
   return (
     <div style={{ padding: "2rem", backgroundColor: "#f3f4f6", borderRadius: "8px", boxShadow: "0 2px 6px rgba(0,0,0,0.05)" }}>
       <h2 style={{ color: "#111827" }}>Research</h2>
-      {error && <p style={{ color: "red" }}>Error: {error}</p>}
+      {error && <p style={{ color: "red" }}>{error}</p>}
 
+      {/* Conditions UI */}
       <div style={{ marginBottom: "1rem" }}>
         {conditions.map((cond, idx) => {
           const colType = columns.find(c => c.column_name === cond.column)?.data_type || "text";
@@ -124,9 +130,10 @@ export default function Research() {
           );
         })}
         <button onClick={addCondition} style={{ padding: "0.4rem 0.8rem", backgroundColor: "#10b981", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", marginRight: "1rem" }}>Add Condition</button>
-        <button onClick={handleReverseEngineer} style={{ padding: "0.4rem 0.8rem", backgroundColor: "#3b82f6", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>Reverse Engineer</button>
+        <button onClick={handleReverseEngineer} style={{ padding: "0.4rem 0.8rem", backgroundColor: "#3b82f6", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>Analyze Conditions</button>
       </div>
 
+      {/* Results */}
       <h3>Results ({results.length})</h3>
       <table style={{ borderCollapse: "collapse", width: "100%" }}>
         <thead>
@@ -139,18 +146,7 @@ export default function Research() {
           {results.map(g => (
             <tr key={g.id}>
               <td style={{ border: "1px solid #ccc", padding: "0.5rem" }}>{g.date}</td>
-              {columns.map(c => (
-                <td key={c.column_name} style={{
-                  border: "1px solid #ccc",
-                  padding: "0.5rem",
-                  backgroundColor: conditions.some(cond =>
-                    cond.column === c.column_name &&
-                    ((cond.operator === ">" && g[c.column_name] > Number(cond.value)) ||
-                     (cond.operator === "<" && g[c.column_name] < Number(cond.value)) ||
-                     (cond.operator === "=" && g[c.column_name] === (isNaN(Number(cond.value)) ? cond.value : Number(cond.value))))
-                  ) ? "#d1fae5" : "transparent"
-                }}>{g[c.column_name]}</td>
-              ))}
+              {columns.map(c => <td key={c.column_name} style={{ border: "1px solid #ccc", padding: "0.5rem" }}>{g[c.column_name]}</td>)}
             </tr>
           ))}
         </tbody>
@@ -161,6 +157,14 @@ export default function Research() {
 
       <h3>Common Factors in Excluded Games</h3>
       <ul>{Object.entries(excludedFactors).map(([k,v]) => <li key={k}>{k}: {v}</li>)}</ul>
+
+      {/* Outcome Analysis Panel */}
+      <OutcomeAnalysisPanel
+        columns={columns}
+        allGames={allGames}
+        savedRules={savedRules}
+        setSavedRules={setSavedRules}
+      />
     </div>
   );
 }
