@@ -3,7 +3,7 @@ name: Deploy React App to GitHub Pages
 on:
   push:
     branches:
-      - main  # or master, whatever your default branch is
+      - main  # or master
 
 jobs:
   build-and-deploy:
@@ -22,6 +22,9 @@ jobs:
         run: npm install
 
       - name: Build React app
+        env:
+          REACT_APP_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: npm run build
 
       - name: Deploy to GitHub Pages
