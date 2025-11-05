@@ -6,16 +6,19 @@ export default function Plays() {
   const [books, setBooks] = useState([]);
   const [metrics, setMetrics] = useState([]);
   const [newPlay, setNewPlay] = useState({
+    play_name: "",
     book_id: "",
     metric_id: "",
     operator: ">",
     threshold: "",
     multiplier: 1,
-    name: "",
   });
+  const [editingId, setEditingId] = useState(null);
+  const [rowData, setRowData] = useState({});
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
 
-  // Fetch existing plays, books, metrics
+  // Fetch plays, books, metrics
   useEffect(() => {
     const fetchPlays = async () => {
       try {
@@ -37,7 +40,7 @@ export default function Plays() {
     const fetchMetrics = async () => {
       try {
         const { data } = await supabase.from("ball_games").select("*").limit(1);
-        setMetrics(data?.length ? Object.keys(data[0]).filter(k => k !== "id" && k !== "date") : []);
+        setMetrics(data?.length ? Object.keys(data[0]) : []);
       } catch {}
     };
 
@@ -46,18 +49,49 @@ export default function Plays() {
     fetchMetrics();
   }, []);
 
+  // Add new play
   const handleAddPlay = async () => {
-    if (!newPlay.name || !newPlay.book_id || !newPlay.metric_id || !newPlay.threshold) {
-      setError("All fields are required.");
-      return;
-    }
-
     try {
-      const { data, error } = await supabase.from("plays").insert([newPlay]);
+      const { data, error } = await supabase.from("plays").insert([newPlay]).select();
       if (error) throw error;
       setPlays([...plays, ...data]);
-      setNewPlay({ book_id: "", metric_id: "", operator: ">", threshold: "", multiplier: 1, name: "" });
-      setError(null);
+      setNewPlay({ play_name: "", book_id: "", metric_id: "", operator: ">", threshold: "", multiplier: 1 });
+      setSuccessMessage("Play added successfully!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // Edit row
+  const handleEdit = (play) => {
+    setEditingId(play.id);
+    setRowData(play);
+  };
+
+  // Save edited row
+  const handleSave = async (id) => {
+    try {
+      const { data, error } = await supabase.from("plays").update(rowData).eq("id", id).select();
+      if (error) throw error;
+      setPlays(plays.map(p => (p.id === id ? data[0] : p)));
+      setEditingId(null);
+      setRowData({});
+      setSuccessMessage("Play saved successfully!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // Delete play
+  const handleDelete = async (id) => {
+    try {
+      const { error } = await supabase.from("plays").delete().eq("id", id);
+      if (error) throw error;
+      setPlays(plays.filter(p => p.id !== id));
+      setSuccessMessage("Play deleted successfully!");
+      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
       setError(err.message);
     }
@@ -67,13 +101,14 @@ export default function Plays() {
     <div style={{ padding: "2rem" }}>
       <h2>Plays</h2>
       {error && <p style={{ color: "red" }}>{error}</p>}
+      {successMessage && <p style={{ color: "green" }}>{successMessage}</p>}
 
-      {/* Add New Play */}
-      <div style={{ marginBottom: "1rem", display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+      {/* Add Play Section */}
+      <div style={{ marginBottom: "1rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
         <input
           placeholder="Play Name"
-          value={newPlay.name}
-          onChange={(e) => setNewPlay({ ...newPlay, name: e.target.value })}
+          value={newPlay.play_name}
+          onChange={(e) => setNewPlay({ ...newPlay, play_name: e.target.value })}
         />
         <select value={newPlay.book_id} onChange={(e) => setNewPlay({ ...newPlay, book_id: e.target.value })}>
           <option value="">Select Book</option>
@@ -101,32 +136,85 @@ export default function Plays() {
           step="0.01"
           onChange={(e) => setNewPlay({ ...newPlay, multiplier: parseFloat(e.target.value) })}
         />
-        <button onClick={handleAddPlay} style={{ padding: "0.4rem 0.8rem", backgroundColor: "#3b82f6", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>
+        <button onClick={handleAddPlay} style={{ backgroundColor: "#10b981", color: "white", padding: "0.5rem 1rem", borderRadius: "5px", border: "none" }}>
           Add Play
         </button>
       </div>
 
       {/* Plays Table */}
-      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%" }}>
         <thead>
           <tr style={{ backgroundColor: "#f3f4f6" }}>
-            <th style={{ border: "1px solid #ccc", padding: "0.5rem" }}>Name</th>
-            <th style={{ border: "1px solid #ccc", padding: "0.5rem" }}>Book</th>
-            <th style={{ border: "1px solid #ccc", padding: "0.5rem" }}>Metric</th>
-            <th style={{ border: "1px solid #ccc", padding: "0.5rem" }}>Operator</th>
-            <th style={{ border: "1px solid #ccc", padding: "0.5rem" }}>Threshold</th>
-            <th style={{ border: "1px solid #ccc", padding: "0.5rem" }}>Multiplier</th>
+            <th>Name</th>
+            <th>Book</th>
+            <th>Metric</th>
+            <th>Operator</th>
+            <th>Threshold</th>
+            <th>Multiplier</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {plays.map((p) => (
-            <tr key={p.id} style={{ textAlign: "center", borderBottom: "1px solid #eee" }}>
-              <td style={{ padding: "0.5rem" }}>{p.name}</td>
-              <td style={{ padding: "0.5rem" }}>{books.find((b) => b.id === p.book_id)?.name || "-"}</td>
-              <td style={{ padding: "0.5rem" }}>{p.metric_id}</td>
-              <td style={{ padding: "0.5rem" }}>{p.operator}</td>
-              <td style={{ padding: "0.5rem" }}>{p.threshold}</td>
-              <td style={{ padding: "0.5rem" }}>{p.multiplier}</td>
+            <tr key={p.id}>
+              <td>
+                {editingId === p.id ? (
+                  <input value={rowData.play_name} onChange={(e) => setRowData({ ...rowData, play_name: e.target.value })} />
+                ) : (
+                  p.play_name
+                )}
+              </td>
+              <td>
+                {editingId === p.id ? (
+                  <select value={rowData.book_id} onChange={(e) => setRowData({ ...rowData, book_id: e.target.value })}>
+                    {books.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                ) : (
+                  books.find((b) => b.id === p.book_id)?.name
+                )}
+              </td>
+              <td>
+                {editingId === p.id ? (
+                  <select value={rowData.metric_id} onChange={(e) => setRowData({ ...rowData, metric_id: e.target.value })}>
+                    {metrics.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                ) : (
+                  p.metric_id
+                )}
+              </td>
+              <td>
+                {editingId === p.id ? (
+                  <select value={rowData.operator} onChange={(e) => setRowData({ ...rowData, operator: e.target.value })}>
+                    <option value=">">&gt;</option>
+                    <option value="<">&lt;</option>
+                    <option value="=">=</option>
+                  </select>
+                ) : (
+                  p.operator
+                )}
+              </td>
+              <td>
+                {editingId === p.id ? (
+                  <input type="number" value={rowData.threshold} onChange={(e) => setRowData({ ...rowData, threshold: e.target.value })} />
+                ) : (
+                  p.threshold
+                )}
+              </td>
+              <td>
+                {editingId === p.id ? (
+                  <input type="number" step="0.01" value={rowData.multiplier} onChange={(e) => setRowData({ ...rowData, multiplier: parseFloat(e.target.value) })} />
+                ) : (
+                  p.multiplier
+                )}
+              </td>
+              <td style={{ display: "flex", gap: "0.5rem" }}>
+                {editingId === p.id ? (
+                  <button onClick={() => handleSave(p.id)} style={{ backgroundColor: "#3b82f6", color: "white", border: "none", padding: "0.3rem 0.6rem", borderRadius: "4px" }}>Save Changes</button>
+                ) : (
+                  <button onClick={() => handleEdit(p)} style={{ backgroundColor: "#f59e0b", color: "white", border: "none", padding: "0.3rem 0.6rem", borderRadius: "4px" }}>Edit</button>
+                )}
+                <button onClick={() => handleDelete(p.id)} style={{ backgroundColor: "#ef4444", color: "white", border: "none", padding: "0.3rem 0.6rem", borderRadius: "4px" }}>Delete</button>
+              </td>
             </tr>
           ))}
         </tbody>
