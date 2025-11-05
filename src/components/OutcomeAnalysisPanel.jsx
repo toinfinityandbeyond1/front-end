@@ -1,19 +1,19 @@
 import React, { useState } from "react";
-import { supabase } from "../supabaseClient";
 
-export default function OutcomeAnalysisPanel({ columns, allGames, savedRules, setSavedRules }) {
+export default function OutcomeAnalysisPanel({ columns, allGames }) {
   const [analysisOutcome, setAnalysisOutcome] = useState({ column: "", operator: ">", value: "" });
-  const [patterns, setPatterns] = useState([]);
-  const operatorMap = { ">": "gt", "<": "lt", "=": "eq" };
+  const [teamAnalysis, setTeamAnalysis] = useState([]);
+  const [offRankAnalysis, setOffRankAnalysis] = useState([]);
 
   const runAnalysis = () => {
     if (!analysisOutcome.column || analysisOutcome.value === "") return;
 
-    const colType = columns.find(c => c.column_name === analysisOutcome.column)?.data_type || "text";
-    const val = ["numeric", "integer"].some(t => colType.includes(t)) ? Number(analysisOutcome.value) : analysisOutcome.value;
+    const val = Number(analysisOutcome.value);
+    const op = analysisOutcome.operator;
 
+    // Filter games based on outcome
     const filteredGames = allGames.filter(g => {
-      switch (analysisOutcome.operator) {
+      switch (op) {
         case ">": return g[analysisOutcome.column] > val;
         case "<": return g[analysisOutcome.column] < val;
         case "=": return g[analysisOutcome.column] === val;
@@ -21,90 +21,133 @@ export default function OutcomeAnalysisPanel({ columns, allGames, savedRules, se
       }
     });
 
-    const patternSummary = columns.map(c => {
-      const colVals = filteredGames.map(g => g[c.column_name]);
-      const counts = {};
-      colVals.forEach(v => {
-        counts[v] = (counts[v] || 0) + 1;
+    // ---- Top 30 Teams Analysis ----
+    const teamMap = {};
+    allGames.forEach(g => {
+      [g.home_team, g.away_team].forEach(team => {
+        if (!teamMap[team]) teamMap[team] = { total: 0, matched: 0 };
       });
-      const mostCommon = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-      const percentage = mostCommon ? ((mostCommon[1] / filteredGames.length) * 100).toFixed(1) : 0;
-      return { column: c.column_name, value: mostCommon?.[0], percentage };
-    }).filter(p => p.percentage > 0);
+    });
 
-    setPatterns(patternSummary);
+    filteredGames.forEach(g => {
+      if (teamMap[g.home_team]) teamMap[g.home_team].matched++;
+      if (teamMap[g.away_team]) teamMap[g.away_team].matched++;
+    });
+
+    allGames.forEach(g => {
+      if (teamMap[g.home_team]) teamMap[g.home_team].total++;
+      if (teamMap[g.away_team]) teamMap[g.away_team].total++;
+    });
+
+    const teamResults = Object.entries(teamMap).map(([team, data]) => ({
+      team,
+      percentage: data.total ? ((data.matched / data.total) * 100).toFixed(1) : 0,
+      total: data.total,
+      matched: data.matched
+    })).sort((a, b) => b.percentage - a.percentage);
+
+    setTeamAnalysis(teamResults.slice(0, 30)); // top 30 teams
+
+    // ---- By Offensive Rank Analysis (ppg_rank) ----
+    const rankMap = {};
+    allGames.forEach(g => {
+      const rank = g.ppg_rank;
+      if (rank != null) {
+        if (!rankMap[rank]) rankMap[rank] = { total: 0, matched: 0 };
+        rankMap[rank].total++;
+      }
+    });
+
+    filteredGames.forEach(g => {
+      const rank = g.ppg_rank;
+      if (rank != null && rankMap[rank]) rankMap[rank].matched++;
+    });
+
+    const rankResults = Object.entries(rankMap).map(([rank, data]) => ({
+      rank,
+      percentage: data.total ? ((data.matched / data.total) * 100).toFixed(1) : 0,
+      total: data.total,
+      matched: data.matched
+    })).sort((a, b) => b.percentage - a.percentage);
+
+    setOffRankAnalysis(rankResults);
   };
 
-  const savePattern = async (pattern) => {
-    try {
-      const { data, error } = await supabase.from("saved_rules").insert([{
-        column: pattern.column,
-        value: pattern.value,
-        percentage: pattern.percentage
-      }]);
-      if (error) throw error;
-      setSavedRules([...savedRules, ...data]);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  // Columns to exclude from pattern analysis
+  const excludedColumns = ["created_at", "game_date"];
 
   return (
-    <div style={{ marginTop: "2rem", border: "2px solid #3b82f6", padding: "1rem", borderRadius: "8px" }}>
+    <div style={{ marginTop: "1rem" }}>
       <h3>Outcome Analysis</h3>
-
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-        <select value={analysisOutcome.column} onChange={e => setAnalysisOutcome({ ...analysisOutcome, column: e.target.value })}>
+      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+        <select
+          value={analysisOutcome.column}
+          onChange={e => setAnalysisOutcome({ ...analysisOutcome, column: e.target.value })}
+        >
           <option value="">Select column</option>
-          {columns.map(c => (
+          {columns.filter(c => !excludedColumns.includes(c.column_name)).map(c => (
             <option key={c.column_name} value={c.column_name}>{c.column_name}</option>
           ))}
         </select>
-
-        <select value={analysisOutcome.operator} onChange={e => setAnalysisOutcome({ ...analysisOutcome, operator: e.target.value })}>
+        <select
+          value={analysisOutcome.operator}
+          onChange={e => setAnalysisOutcome({ ...analysisOutcome, operator: e.target.value })}
+        >
           <option value=">">&gt;</option>
           <option value="<">&lt;</option>
           <option value="=">=</option>
         </select>
-
         <input
           type="number"
           placeholder="Value"
           value={analysisOutcome.value}
           onChange={e => setAnalysisOutcome({ ...analysisOutcome, value: e.target.value })}
         />
-
         <button
           onClick={runAnalysis}
-          style={{ backgroundColor: "#3b82f6", color: "white", border: "none", padding: "0.4rem 0.8rem", borderRadius: "4px" }}
+          style={{
+            backgroundColor: "#3b82f6",
+            color: "white",
+            border: "none",
+            padding: "0.4rem 0.8rem",
+            borderRadius: "4px",
+            cursor: "pointer"
+          }}
         >
           Analyze
         </button>
       </div>
 
-      <h4>Discovered Patterns</h4>
-      <ul>
-        {patterns.map((p, i) => (
-          <li key={i} style={{ marginBottom: "0.3rem" }}>
-            {p.column}: {p.value} ({p.percentage}%)
-            <button
-              onClick={() => savePattern(p)}
-              style={{ marginLeft: "0.5rem", backgroundColor: "#10b981", color: "white", border: "none", padding: "0.2rem 0.5rem", borderRadius: "4px" }}
-            >
-              Save
-            </button>
-          </li>
-        ))}
-      </ul>
+      {/* Top 30 Teams */}
+      <div style={{
+        border: "2px solid #10b981",
+        borderRadius: "8px",
+        padding: "1rem",
+        marginBottom: "1rem",
+        width: "48%"
+      }}>
+        <h4>Top 30 Teams</h4>
+        <ul>
+          {teamAnalysis.map((t, i) => (
+            <li key={i}>{t.team}: {t.percentage}% ({t.matched}/{t.total})</li>
+          ))}
+        </ul>
+      </div>
 
-      <h4>Saved Rules</h4>
-      <ul>
-        {savedRules.map((r, i) => (
-          <li key={i}>
-            {r.column}: {r.value} ({r.percentage}%)
-          </li>
-        ))}
-      </ul>
+      {/* Offensive Rank */}
+      <div style={{
+        border: "2px solid #f59e0b",
+        borderRadius: "8px",
+        padding: "1rem",
+        width: "48%"
+      }}>
+        <h4>By Offensive Rank (ppg_rank)</h4>
+        <ul>
+          {offRankAnalysis.map((r, i) => (
+            <li key={i}>Rank {r.rank}: {r.percentage}% ({r.matched}/{r.total})</li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
