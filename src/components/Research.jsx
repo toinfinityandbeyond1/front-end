@@ -5,27 +5,25 @@ export default function Research() {
   const [columns, setColumns] = useState([]);
   const [conditions, setConditions] = useState([]);
   const [results, setResults] = useState([]);
-  const [excluded, setExcluded] = useState([]);
+  const [, setExcluded] = useState([]); // unused, avoid eslint error
   const [commonFactors, setCommonFactors] = useState({});
   const [excludedFactors, setExcludedFactors] = useState({});
   const [error, setError] = useState(null);
 
-    useEffect(() => {
-  const testFetch = async () => {
-    try {
-      console.log("Testing full table fetch...");
-      const { data, error } = await supabase.from("ball_games").select("*").limit(5); // fetch 5 rows for quick test
-      if (error) throw error;
-      console.log("Test fetch returned rows:", data);
-    } catch (err) {
-      console.error("Test fetch error:", err);
-    }
-  };
-
-  testFetch();
-}, []);
-
-
+  // ---------------- Quick test fetch ----------------
+  useEffect(() => {
+    const testFetch = async () => {
+      try {
+        console.log("Testing full table fetch...");
+        const { data, error } = await supabase.from("ball_games").select("*").limit(5);
+        if (error) throw error;
+        console.log("Test fetch returned rows:", data);
+      } catch (err) {
+        console.error("Test fetch error:", err);
+      }
+    };
+    testFetch();
+  }, []);
 
   // ---------------- Load columns from RPC ----------------
   useEffect(() => {
@@ -37,13 +35,12 @@ export default function Research() {
 
         const filtered = data.filter(c => !["id", "date"].includes(c.column_name));
         console.log("Columns loaded:", filtered);
-        setColumns(filtered); // columns = {column_name, data_type}
+        setColumns(filtered);
       } catch (err) {
         console.error("Error fetching columns:", err);
         setError(err.message);
       }
     };
-
     fetchColumns();
   }, []);
 
@@ -218,7 +215,7 @@ export default function Research() {
                     cond.column === c.column_name &&
                     ((cond.operator === ">" && g[c.column_name] > Number(cond.value)) ||
                      (cond.operator === "<" && g[c.column_name] < Number(cond.value)) ||
-                     (cond.operator === "=" && g[c.column_name] == (isNaN(Number(cond.value)) ? cond.value : Number(cond.value))))
+                     (cond.operator === "=" && g[c.column_name] === (isNaN(Number(cond.value)) ? cond.value : Number(cond.value))))
                   ) ? "#d1fae5" : "transparent"
                 }}>
                   {g[c.column_name]}
