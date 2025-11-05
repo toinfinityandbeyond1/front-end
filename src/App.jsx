@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import NavBar from "./components/NavBar";
 import Scrapers from "./components/Scrapers";
@@ -9,20 +9,19 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Load last tab from localStorage, default to '/scrapers'
+  // Load last tab from localStorage, default to "/research"
   const [activeTab, setActiveTab] = useState(() => {
-    const saved = localStorage.getItem("activeTab");
-    return saved || "/scrapers";
+    return localStorage.getItem("activeTab") || "/research";
   });
 
-  // Sync activeTab with URL
+  // Sync URL with activeTab
   useEffect(() => {
     if (location.pathname !== activeTab) {
       navigate(activeTab, { replace: true });
     }
   }, [activeTab]);
 
-  // Save tab to localStorage whenever it changes
+  // Save active tab in localStorage
   useEffect(() => {
     localStorage.setItem("activeTab", activeTab);
   }, [activeTab]);
@@ -33,9 +32,9 @@ export default function App() {
       <div style={{ padding: "2rem" }}>
         <Routes>
           <Route path="/" element={<Navigate to={activeTab} replace />} />
-          <Route path="/scrapers" element={<Scrapers />} />
-          <Route path="/data" element={<Data />} />
           <Route path="/research" element={<Research />} />
+          <Route path="/data" element={<Data />} />
+          <Route path="/scrapers" element={<Scrapers />} />
         </Routes>
       </div>
     </div>

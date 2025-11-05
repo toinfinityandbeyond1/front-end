@@ -2,25 +2,35 @@ import React from "react";
 
 export default function NavBar({ activeTab, setActiveTab }) {
   const tabs = [
-    { name: "Scrapers", path: "/scrapers" },
-    { name: "Data", path: "/data" },
     { name: "Research", path: "/research" },
+    { name: "Data", path: "/data" },
+    { name: "Scrapers", path: "/scrapers" },
   ];
 
   return (
-    <nav style={{ padding: "1rem", background: "#f0f0f0" }}>
+    <nav
+      style={{
+        display: "flex",
+        justifyContent: "flex-start",
+        backgroundColor: "#1f2937", // dark gray
+        padding: "0.5rem 2rem",
+        boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+      }}
+    >
       {tabs.map((tab) => (
         <button
           key={tab.path}
           onClick={() => setActiveTab(tab.path)}
           style={{
-            marginRight: "0.5rem",
-            padding: "0.5rem 1rem",
-            borderRadius: "4px",
+            marginRight: "1rem",
+            padding: "0.6rem 1.2rem",
+            borderRadius: "6px",
             border: "none",
             cursor: "pointer",
-            backgroundColor: activeTab === tab.path ? "#007BFF" : "#EEE",
-            color: activeTab === tab.path ? "white" : "black",
+            fontWeight: "bold",
+            backgroundColor: activeTab === tab.path ? "#3b82f6" : "#374151", // active: blue, inactive: darker gray
+            color: activeTab === tab.path ? "white" : "#d1d5db", // active white, inactive light gray
+            transition: "background-color 0.2s",
           }}
         >
           {tab.name}
