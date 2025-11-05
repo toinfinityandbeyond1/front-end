@@ -8,47 +8,65 @@ export default function Research() {
   const [excluded, setExcluded] = useState([]);
   const [commonFactors, setCommonFactors] = useState({});
   const [excludedFactors, setExcludedFactors] = useState({});
+  const [error, setError] = useState(null);
 
-  // -------- Load columns from table metadata --------
+    useEffect(() => {
+  const testFetch = async () => {
+    try {
+      console.log("Testing full table fetch...");
+      const { data, error } = await supabase.from("ball_games").select("*").limit(5); // fetch 5 rows for quick test
+      if (error) throw error;
+      console.log("Test fetch returned rows:", data);
+    } catch (err) {
+      console.error("Test fetch error:", err);
+    }
+  };
+
+  testFetch();
+}, []);
+
+
+
+  // ---------------- Load columns from RPC ----------------
   useEffect(() => {
     const fetchColumns = async () => {
       try {
-        const { data, error } = await supabase
-          .from("information_schema.columns")
-          .select("column_name")
-          .eq("table_name", "games");
-
+        console.log("Fetching columns from RPC...");
+        const { data, error } = await supabase.rpc("get_table_columns", { tablename: "ball_games" });
         if (error) throw error;
 
-        // filter out system columns
-        const cols = data
-          .map((c) => c.column_name)
-          .filter((c) => c !== "id" && c !== "date");
-        setColumns(cols);
+        const filtered = data.filter(c => !["id", "date"].includes(c.column_name));
+        console.log("Columns loaded:", filtered);
+        setColumns(filtered); // columns = {column_name, data_type}
       } catch (err) {
         console.error("Error fetching columns:", err);
+        setError(err.message);
       }
     };
 
     fetchColumns();
   }, []);
 
-  // -------- Add / update conditions --------
+  // ---------------- Add / update conditions ----------------
   const addCondition = () => {
-    setConditions([...conditions, { logic: "AND", column: "", operator: ">", value: "" }]);
+    setConditions([...conditions, { logic: "AND", column: "", operator: "", value: "" }]);
   };
 
   const updateCondition = (index, key, value) => {
-    const newConditions = [...conditions];
-    newConditions[index][key] = value;
-    setConditions(newConditions);
+    const updated = [...conditions];
+    updated[index][key] = value;
+    setConditions(updated);
   };
 
-  // -------- Run query with conditions --------
+  // ---------------- Reverse Engineer ----------------
   const handleReverseEngineer = async () => {
-    if (conditions.length === 0) return;
+    console.log("=== Reverse Engineer started ===");
+    console.log("Conditions:", conditions);
+
+    if (!conditions.length) return;
 
     let includedGames = [];
+    const numericTypes = ["numeric", "integer", "bigint", "smallint", "real", "double precision"];
 
     // Split into OR groups
     let orGroups = [];
@@ -60,92 +78,116 @@ export default function Research() {
         currentGroup = [];
       }
     });
+    console.log("OR groups:", orGroups);
 
-    for (let group of orGroups) {
-      let query = supabase.from("games").select("*");
-      group.forEach(({ column, operator, value }) => {
-        if (!column || value === "") return;
-        switch (operator) {
-          case ">":
-            query = query.gt(column, value);
-            break;
-          case "<":
-            query = query.lt(column, value);
-            break;
-          case "=":
-            query = query.eq(column, value);
-            break;
-          default:
-            break;
+    for (let [groupIndex, group] of orGroups.entries()) {
+      let query = supabase.from("ball_games").select("*");
+      console.log(`Processing group ${groupIndex + 1}:`, group);
+
+      for (let cond of group) {
+        if (!cond.column || cond.value === "") {
+          console.warn("Skipping incomplete condition:", cond);
+          continue;
         }
-      });
+
+        const colType = columns.find(c => c.column_name === cond.column)?.data_type || "text";
+        const val = numericTypes.some(t => colType.includes(t)) ? Number(cond.value) : cond.value;
+        console.log(`Filtering ${cond.column} ${cond.operator} ${val} (type: ${colType})`);
+
+        switch (cond.operator) {
+          case ">": query = query.gt(cond.column, val); break;
+          case "<": query = query.lt(cond.column, val); break;
+          case "=": query = query.eq(cond.column, val); break;
+          default: console.warn("Unknown operator:", cond.operator); break;
+        }
+      }
 
       const { data, error } = await query;
-      if (error) continue;
+      if (error) {
+        console.error("Supabase query error:", error);
+        continue;
+      }
+      console.log("Query returned rows:", data?.length);
       data.forEach((g) => {
-        if (!includedGames.some((i) => i.id === g.id)) includedGames.push(g);
+        if (!includedGames.some(i => i.id === g.id)) includedGames.push(g);
       });
     }
 
+    console.log("Total included games:", includedGames.length);
     setResults(includedGames);
 
     // Fetch all games to compute excluded & common factors
-    const { data: allGames, error: allError } = await supabase.from("games").select("*");
-    if (allError) return console.error(allError);
-    const excludedGames = allGames.filter((g) => !includedGames.some((i) => i.id === g.id));
+    const { data: allGames, error: allError } = await supabase.from("ball_games").select("*");
+    if (allError) {
+      console.error("Error fetching all games:", allError);
+      return;
+    }
+
+    const excludedGames = allGames.filter(g => !includedGames.some(i => i.id === g.id));
+    console.log("Total excluded games:", excludedGames.length);
     setExcluded(excludedGames);
 
     // Compute common factors
-    const factorCols = columns;
+    const factorCols = columns.map(c => c.column_name);
     const common = {};
     const excludedCommon = {};
-    factorCols.forEach((col) => {
-      const includedValues = [...new Set(includedGames.map((g) => g[col]))];
-      if (includedValues.length === 1) common[col] = includedValues[0];
-      const excludedValues = [...new Set(excludedGames.map((g) => g[col]))];
-      if (excludedValues.length === 1) excludedCommon[col] = excludedValues[0];
+    factorCols.forEach(col => {
+      const includedVals = [...new Set(includedGames.map(g => g[col]))];
+      if (includedVals.length === 1) common[col] = includedVals[0];
+
+      const excludedVals = [...new Set(excludedGames.map(g => g[col]))];
+      if (excludedVals.length === 1) excludedCommon[col] = excludedVals[0];
     });
+
+    console.log("Common factors in included games:", common);
+    console.log("Common factors in excluded games:", excludedCommon);
+
     setCommonFactors(common);
     setExcludedFactors(excludedCommon);
+
+    console.log("=== Reverse Engineer complete ===");
   };
 
-  // -------- JSX UI --------
+  // ---------------- JSX UI ----------------
   return (
     <div style={{ padding: "2rem", backgroundColor: "#f3f4f6", borderRadius: "8px", boxShadow: "0 2px 6px rgba(0,0,0,0.05)" }}>
       <h2 style={{ color: "#111827" }}>Research</h2>
+      {error && <p style={{ color: "red" }}>Error: {error}</p>}
 
       <div style={{ marginBottom: "1rem" }}>
-        {conditions.map((cond, idx) => (
-          <div key={idx} style={{ marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            {idx > 0 && (
-              <select value={cond.logic} onChange={(e) => updateCondition(idx, "logic", e.target.value)}>
-                <option value="AND">AND</option>
-                <option value="OR">OR</option>
+        {conditions.map((cond, idx) => {
+          const colType = columns.find(c => c.column_name === cond.column)?.data_type || "text";
+          const operators = colType.includes("numeric") || colType.includes("integer") ? [">","<","="] : ["=","contains"];
+
+          return (
+            <div key={idx} style={{ marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              {idx > 0 && (
+                <select value={cond.logic} onChange={e => updateCondition(idx, "logic", e.target.value)}>
+                  <option value="AND">AND</option>
+                  <option value="OR">OR</option>
+                </select>
+              )}
+
+              <select value={cond.column} onChange={e => updateCondition(idx, "column", e.target.value)}>
+                <option value="">Select column</option>
+                {columns.map(c => <option key={c.column_name} value={c.column_name}>{c.column_name}</option>)}
               </select>
-            )}
 
-            <select value={cond.column} onChange={(e) => updateCondition(idx, "column", e.target.value)}>
-              <option value="">Select column</option>
-              {columns.map((col) => (
-                <option key={col} value={col}>{col}</option>
-              ))}
-            </select>
+              <select value={cond.operator} onChange={e => updateCondition(idx, "operator", e.target.value)}>
+                <option value="">Select operator</option>
+                {operators.map(op => <option key={op} value={op}>{op}</option>)}
+              </select>
 
-            <select value={cond.operator} onChange={(e) => updateCondition(idx, "operator", e.target.value)}>
-              <option value=">">&gt;</option>
-              <option value="<">&lt;</option>
-              <option value="=">=</option>
-            </select>
-
-            <input
-              type="number"
-              value={cond.value}
-              onChange={(e) => updateCondition(idx, "value", e.target.value)}
-              placeholder="Value"
-              style={{ width: "100px" }}
-            />
-          </div>
-        ))}
+              <input
+                type={colType.includes("numeric") || colType.includes("integer") ? "number" : "text"}
+                value={cond.value}
+                onChange={e => updateCondition(idx, "value", e.target.value)}
+                placeholder="Value"
+                style={{ width: "100px" }}
+              />
+            </div>
+          );
+        })}
 
         <button onClick={addCondition} style={{ padding: "0.4rem 0.8rem", backgroundColor: "#10b981", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", marginRight: "1rem" }}>
           Add Condition
@@ -161,24 +203,25 @@ export default function Research() {
         <thead>
           <tr>
             <th style={{ border: "1px solid #ccc", padding: "0.5rem" }}>Date</th>
-            {columns.map((col) => <th key={col} style={{ border: "1px solid #ccc", padding: "0.5rem" }}>{col}</th>)}
+            {columns.map(c => <th key={c.column_name} style={{ border: "1px solid #ccc", padding: "0.5rem" }}>{c.column_name}</th>)}
           </tr>
         </thead>
         <tbody>
-          {results.map((g) => (
+          {results.map(g => (
             <tr key={g.id}>
               <td style={{ border: "1px solid #ccc", padding: "0.5rem" }}>{g.date}</td>
-              {columns.map((col) => (
-                <td key={col} style={{
+              {columns.map(c => (
+                <td key={c.column_name} style={{
                   border: "1px solid #ccc",
                   padding: "0.5rem",
-                  backgroundColor: conditions.some(c => c.column === col && (
-                    (c.operator === ">" && g[col] > Number(c.value)) ||
-                    (c.operator === "<" && g[col] < Number(c.value)) ||
-                    (c.operator === "=" && g[col] === Number(c.value))
-                  )) ? "#d1fae5" : "transparent"
+                  backgroundColor: conditions.some(cond =>
+                    cond.column === c.column_name &&
+                    ((cond.operator === ">" && g[c.column_name] > Number(cond.value)) ||
+                     (cond.operator === "<" && g[c.column_name] < Number(cond.value)) ||
+                     (cond.operator === "=" && g[c.column_name] == (isNaN(Number(cond.value)) ? cond.value : Number(cond.value))))
+                  ) ? "#d1fae5" : "transparent"
                 }}>
-                  {g[col]}
+                  {g[c.column_name]}
                 </td>
               ))}
             </tr>
