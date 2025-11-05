@@ -36,7 +36,7 @@ export default function App() {
   };
 
   return (
-    <div>
+    <div style={{ minHeight: "100vh", backgroundColor: "#f9fafb" }}>
       <NavBar activeTab={activeTab} setActiveTab={setActiveTab} />
       <div style={{ padding: "1rem" }}>{renderTab()}</div>
     </div>

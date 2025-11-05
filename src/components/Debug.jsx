@@ -1,4 +1,3 @@
-// src/components/Debug.jsx
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 
@@ -12,29 +11,14 @@ export default function Debug() {
       try {
         console.log("Testing Supabase connection...");
 
-        // Fetch columns using RPC
         const { data: colData, error: colError } = await supabase.rpc("get_table_columns", { tablename: "ball_games" });
-        if (colError) {
-          setError(colError.message);
-          console.error("Column fetch error:", colError);
-        } else {
-          setColumns(colData.map((c) => c.column_name));
-          console.log("Columns fetched:", colData);
-        }
+        if (colError) throw colError;
+        setColumns(colData.map((c) => c.column_name));
 
-        // Fetch first row from ball_games
-        const { data: rowData, error: rowError } = await supabase
-          .from("ball_games")
-          .select("*")
-          .limit(1);
+        const { data: rowData, error: rowError } = await supabase.from("ball_games").select("*").limit(1);
+        if (rowError) throw rowError;
+        setRows(rowData);
 
-        if (rowError) {
-          setError(rowError.message);
-          console.error("Row fetch error:", rowError);
-        } else {
-          setRows(rowData);
-          console.log("Row data fetched:", rowData);
-        }
       } catch (err) {
         setError(err.message);
         console.error("Unexpected error:", err);
@@ -51,9 +35,7 @@ export default function Debug() {
 
       <h3>Columns:</h3>
       <ul>
-        {columns.length
-          ? columns.map((c) => <li key={c}>{c}</li>)
-          : <li>No columns loaded</li>}
+        {columns.length ? columns.map((c) => <li key={c}>{c}</li>) : <li>No columns loaded</li>}
       </ul>
 
       <h3>First Row Data:</h3>

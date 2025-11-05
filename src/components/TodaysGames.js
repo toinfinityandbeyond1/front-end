@@ -9,11 +9,7 @@ export default function TodaysGames() {
     const fetchTodaysGames = async () => {
       try {
         const today = new Date().toISOString().split("T")[0];
-        const { data, error } = await supabase
-          .from("ball_games")
-          .select("*")
-          .eq("date", today);
-
+        const { data, error } = await supabase.from("ball_games").select("*").eq("date", today);
         if (error) throw error;
         setGames(data);
       } catch (err) {
@@ -40,7 +36,7 @@ export default function TodaysGames() {
           </tr>
         </thead>
         <tbody>
-          {games.map((g) => (
+          {games.map(g => (
             <tr key={g.id}>
               <td style={{ border: "1px solid #ccc", padding: "0.5rem" }}>{g.date}</td>
               <td style={{ border: "1px solid #ccc", padding: "0.5rem" }}>{g.home_team}</td>

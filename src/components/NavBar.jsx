@@ -2,24 +2,26 @@ import React from "react";
 
 export default function NavBar({ activeTab, setActiveTab }) {
   const tabs = [
-    { name: "Plays", path: "/plays" },
-    { name: "Trends", path: "/trends" },
-    { name: "Bots", path: "/bots" },
-    { name: "Todays Games", path: "/todays-games" },
-    { name: "Research", path: "/research" },
-    { name: "Data", path: "/data" },
-    { name: "Scrapers", path: "/scrapers" },
-    { name: "Debug", path: "/debug" },
+    { label: "Plays", path: "/plays" },
+    { label: "Trends", path: "/trends" },
+    { label: "Bots", path: "/bots" },
+    { label: "Today's Games", path: "/todays-games" },
+    { label: "Research", path: "/research" },
+    { label: "Data", path: "/data" },
+    { label: "Scrapers", path: "/scrapers" },
+    { label: "Debug", path: "/debug" },
   ];
 
   return (
     <nav
       style={{
         display: "flex",
-        justifyContent: "flex-start",
-        backgroundColor: "#1f2937",
-        padding: "0.5rem 2rem",
-        boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+        gap: "0.5rem",
+        padding: "1rem",
+        backgroundColor: "#111827",
+        color: "white",
+        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+        borderRadius: "0 0 8px 8px",
       }}
     >
       {tabs.map((tab) => (
@@ -27,18 +29,22 @@ export default function NavBar({ activeTab, setActiveTab }) {
           key={tab.path}
           onClick={() => setActiveTab(tab.path)}
           style={{
-            marginRight: "1rem",
-            padding: "0.6rem 1.2rem",
-            borderRadius: "6px",
-            border: "none",
-            cursor: "pointer",
-            fontWeight: "bold",
-            backgroundColor: activeTab === tab.path ? "#3b82f6" : "#374151",
+            padding: "0.5rem 1rem",
+            backgroundColor: activeTab === tab.path ? "#3b82f6" : "transparent",
             color: activeTab === tab.path ? "white" : "#d1d5db",
-            transition: "background-color 0.2s",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+            transition: "all 0.2s ease-in-out",
+          }}
+          onMouseEnter={(e) => {
+            if (activeTab !== tab.path) e.target.style.backgroundColor = "#1f2937";
+          }}
+          onMouseLeave={(e) => {
+            if (activeTab !== tab.path) e.target.style.backgroundColor = "transparent";
           }}
         >
-          {tab.name}
+          {tab.label}
         </button>
       ))}
     </nav>
