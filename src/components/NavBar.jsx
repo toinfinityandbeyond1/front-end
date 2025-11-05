@@ -5,6 +5,7 @@ export default function NavBar({ activeTab, setActiveTab }) {
     { name: "Research", path: "/research" },
     { name: "Data", path: "/data" },
     { name: "Scrapers", path: "/scrapers" },
+    { name: "Debug", path: "/debug" },
   ];
 
   return (

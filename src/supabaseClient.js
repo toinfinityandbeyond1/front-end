@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = "https://YOUR_SUPABASE_PROJECT_ID.supabase.co";
-const supabaseKey = "YOUR_ANON_KEY"; // safe for client read operations
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+
 export const supabase = createClient(supabaseUrl, supabaseKey);
