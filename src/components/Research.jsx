@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import OutcomeAnalysisPanel from "./OutcomeAnalysisPanel";
+import Simulator from "./Simulator";
 
 export default function Research() {
   const [columns, setColumns] = useState([]);
@@ -152,6 +153,13 @@ export default function Research() {
     >
       <h2 style={{ color: "#111827" }}>Research</h2>
       {error && <p style={{ color: "red" }}>Error: {error}</p>}
+
+      <Simulator
+          columns={columns}
+          allGames={allGames}
+          savedRules={savedRules}
+          setSavedRules={setSavedRules}
+        />
 
       <div style={{ marginBottom: "1rem" }}>
         {conditions.map((cond, idx) => {

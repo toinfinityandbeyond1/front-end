@@ -2,12 +2,12 @@ import React from "react";
 
 export default function NavBar({ activeTab, setActiveTab }) {
   const tabs = [
+    { label: "Data", path: "/data" },
     { label: "Plays", path: "/plays" },
     { label: "Trends", path: "/trends" },
     { label: "Bots", path: "/bots" },
     { label: "Today's Games", path: "/todays-games" },
     { label: "Research", path: "/research" },
-    { label: "Data", path: "/data" },
     { label: "Scrapers", path: "/scrapers" },
     { label: "Debug", path: "/debug" },
   ];

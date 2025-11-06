@@ -1,12 +1,11 @@
 import React from "react";
-import ReactDOM from "react-dom/client"; // CRA: 'react-dom'
-import { HashRouter } from "react-router-dom";
+import ReactDOM from "react-dom/client"; // React 19 uses createRoot
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import App from "./App";
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <HashRouter>
-      <App />
-    </HashRouter>
-  </React.StrictMode>
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+  <ChakraProvider value={defaultSystem}>
+    <App />
+  </ChakraProvider>
 );

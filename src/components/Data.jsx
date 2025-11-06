@@ -1,17 +1,25 @@
+// src/components/Data.jsx
 import React from "react";
+import { Box, Heading, SimpleGrid } from "@chakra-ui/react";
+import ServerModule from "./ServerModule";
 
 export default function Data() {
+  const servers = [
+    { name: "Supabase" },
+    { name: "AWS RDS" },
+    { name: "Local Dev Server" },
+  ];
+
   return (
-    <section
-      style={{
-        backgroundColor: "#fef3c7",
-        padding: "2rem",
-        borderRadius: "8px",
-        boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
-      }}
-    >
-      <h2 style={{ color: "#78350f" }}>Data</h2>
-      <p style={{ color: "#92400e" }}>View and analyze your collected sports data here.</p>
-    </section>
+    <Box p={6} bg="yellow.50" borderRadius="lg" shadow="sm">
+      <Heading as="h2" size="lg" mb={4} color="orange.700">
+        Data Overview
+      </Heading>
+      <SimpleGrid columns={{ base: 1, sm: 2, md: 3 }} spacing={6}>
+        {servers.map((server) => (
+          <ServerModule key={server.name} name={server.name} />
+        ))}
+      </SimpleGrid>
+    </Box>
   );
 }
